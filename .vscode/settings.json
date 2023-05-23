@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.html": "html",
+        "*.tcc": "cpp",
+        "unordered_map": "cpp",
+        "numeric": "cpp",
+        "ostream": "cpp"
+    },
+    "cmake.sourceDirectory": "G:/Engineering/NodeMCU/MedDispenser/.pio/libdeps/modwifi/WiFiManager"
+}

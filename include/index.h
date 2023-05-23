@@ -266,6 +266,9 @@ const char index_html[] PROGMEM = R"rawliteral(
     <script>
         var numbers = document.querySelectorAll('.number');
         var tcountdown = 3600000;
+        var countDownDate = new Date().getTime()
+        var now = new Date().getTime();
+        var distance = _countDownDate - now;
         // var countDownDate = new Date().getTime() + tcountdown;
 
         for (var i = 0; i < numbers.length; i++) {
@@ -300,7 +303,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         function startReminder() {
             var countdown = Number(document.getElementById("set_hours").innerText) * 3600 + Number(document.getElementById("set_minutes").innerText) * 60;
             tcountdown = countdown * 1000;
-            var countDownDate = new Date().getTime() + tcountdown;
+            countDownDate = new Date().getTime() + tcountdown;
 
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
@@ -320,8 +323,9 @@ const char index_html[] PROGMEM = R"rawliteral(
             const day = hour * 24;
 
             var x = setInterval(function () {
-                var now = new Date().getTime();
-                var distance = _countDownDate - now;
+                document.getElementById("headline").innerText = " To Take Medicine!";
+                now = new Date().getTime();
+                distance = _countDownDate - now;
 
                 document.getElementById("hours").innerText = Math.floor((distance % (day)) / (hour));
                 document.getElementById("minutes").innerText = Math.floor((distance % (hour)) / (minute));
@@ -333,7 +337,7 @@ const char index_html[] PROGMEM = R"rawliteral(
                     // document.getElementById("countdown").style.display = "none";
                     // document.getElementById("content").style.display = "block";
                     clearInterval(x);
-                    var countDownDate = new Date().getTime() + tcountdown;
+                    countDownDate = new Date().getTime() + tcountdown;
                     var xhttp = new XMLHttpRequest();
                     xhttp.onreadystatechange = function () {
                         if (this.readyState == 4 && this.status == 200) {

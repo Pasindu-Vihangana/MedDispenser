@@ -1,3 +1,15 @@
+
+// Liverpool John Moores University;
+// Msc in Embedded Systems and IC Design;
+// Semester 1 Project - IoT Medical Dispenser;
+// Lecturer;
+// Dr.Samiru Gayan;
+// Students Associated;
+// Sanidi Sasenya       - 22pg0046;
+// Pasindu Vihangana    - 22pg0060;
+// Pasindu Wijewardena  - 22pg0051;
+// May .2023
+
 #include <Arduino.h>
 #include <Esp.h>
 #include <ESP8266WiFi.h>
@@ -5,10 +17,13 @@
 #include <WifiManager.h>
 #include <DNSServer.h>
 #include <ESP_Mail_Client.h>
+#include <LiquidCrystal_I2C.h>
 
 #include "index.h"
 
 #define ONBOARD_LED 2
+
+#define BUZZER 2
 
 #define TRAY_P0 15
 #define TRAY_P1 13
@@ -16,17 +31,18 @@
 #define TRAY_P3 14
 
 #define ROTATE 16
-#define EJECT 5
+#define EJECT 0
 
-#define COMPLETE 4
-#define ERROR 16
-#define BUSSY 3
+#define COMPLETE A0
 
 #define SMTP_HOST "smtp.gmail.com"
 #define SMTP_PORT 465
 
-// put function declarations here:
-void setPosition(uint8_t column_number);
+    // put function declarations here:
+    void
+    setPosition(uint8_t column_number);
+
+void bootSystem();
 
 void GPIO_init();
 
@@ -50,6 +66,7 @@ void rootServer();
 WiFiManager WiFi_Manager;
 const char MAC_ADDRESS[] = "C8:2B:96:1F:27:93";
 const char AP_PASSWORD[] = "Password";
+uint8_t LOCAL_IP[4];
 
 SMTPSession smtp;
 void smtpCallback(SMTP_Status status);
@@ -61,28 +78,76 @@ const char RECIPIENT_EMAIL[] = "22pg0060@sltc.ac.lk";
 
 ESP8266WebServer server(80); // Server on port 80
 
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
 unsigned long count = 0;
 unsigned long countdown = 0;
 
 uint8_t loadedStack = 0;
 
+unsigned long timer_eject;
+unsigned long timer_reminder;
+
+unsigned long allowed_delay = 5 * 60 * 1000; // (min)
+bool med_taken = false;
+
+unsigned long looprate_timer;
+
+unsigned long buzzer_timer;
+
 void setup()
 {
-  Serial.begin(115200);
-  Serial.println("Serial Com Started");
+  bootSystem();
+
   GPIO_init();
-  Serial.println("GPIO Set");
-  onboardLED_off();
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.printstr("ACCESSPOINT ON");
+  // delay(500);
+
   autoConnectWiFi();
-  onboardLED_on();
-  Serial.println("Setup Done");
+
   init_server_request();
-  emailNotification();
+
+  looprate_timer = millis();
 }
 
 void loop()
 {
   server.handleClient();
+
+  if (millis() - looprate_timer > 200)
+  {
+    looprate_timer = millis();
+    if (!med_taken && analogRead(COMPLETE) > 800)
+    {
+
+      digitalWrite(EJECT, HIGH);
+    }
+
+    if (digitalRead(EJECT) && analogRead(COMPLETE) < 800)
+    {
+      med_taken = true;
+      digitalWrite(EJECT, LOW);
+    }
+
+    if (!med_taken && millis() - timer_eject > allowed_delay)
+    {
+      emailNotification();
+      timer_eject = millis();
+    }
+
+    if (!med_taken && digitalRead(EJECT) && millis() - buzzer_timer > 2000)
+    {
+      tone(BUZZER, 200, 100);
+    }
+
+    if (med_taken)
+    {
+      digitalWrite(BUZZER, LOW);
+    }
+  }
 }
 
 void setPosition(uint8_t column_number)
@@ -203,9 +268,33 @@ void setPosition(uint8_t column_number)
   }
 }
 
+void bootSystem()
+{
+  lcd.begin();
+  lcd.backlight();
+  delay(300);
+  lcd.noBacklight();
+  delay(300);
+  lcd.backlight();
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.printstr("Booting");
+  delay(300);
+  lcd.write('.');
+  delay(300);
+  lcd.write('.');
+  delay(300);
+  lcd.write('.');
+  delay(300);
+
+  Serial.begin(115200);
+  Serial.println("Serial Com Started");
+}
+
 void GPIO_init()
 {
-  pinMode(ONBOARD_LED, OUTPUT);
+  // pinMode(ONBOARD_LED, OUTPUT);
 
   pinMode(TRAY_P0, OUTPUT);
   pinMode(TRAY_P1, OUTPUT);
@@ -215,17 +304,25 @@ void GPIO_init()
   pinMode(ROTATE, OUTPUT);
   pinMode(EJECT, OUTPUT);
 
+  digitalWrite(TRAY_P0, HIGH);
+  digitalWrite(TRAY_P1, HIGH);
+  digitalWrite(TRAY_P2, HIGH);
+  digitalWrite(TRAY_P3, HIGH);
+
+  digitalWrite(ROTATE, HIGH);
+  delay(1000);
+  digitalWrite(ROTATE, LOW);
+
+  digitalWrite(EJECT, HIGH);
+  delay(1000);
+  digitalWrite(EJECT, LOW);
+
   digitalWrite(TRAY_P0, LOW);
   digitalWrite(TRAY_P1, LOW);
   digitalWrite(TRAY_P2, LOW);
   digitalWrite(TRAY_P3, LOW);
 
-  digitalWrite(ROTATE, LOW);
-  digitalWrite(EJECT, LOW);
-
-  pinMode(COMPLETE, INPUT);
-  // pinMode(ERROR, INPUT);
-  // pinMode(BUSSY, INPUT);
+  // pinMode(COMPLETE, INPUT);
 }
 
 void onboardLED_on()
@@ -242,6 +339,7 @@ void onboardLED_off()
 
 void runRotation()
 {
+  timer_eject = millis();
   digitalWrite(ROTATE, HIGH);
   delay(1000);
   digitalWrite(ROTATE, LOW);
@@ -254,9 +352,30 @@ void autoConnectWiFi()
   Serial.print("SSID: ");
   Serial.println(MAC_ADDRESS);
   WiFi_Manager.autoConnect(MAC_ADDRESS, AP_PASSWORD);
-  Serial.println("connected");
+  Serial.println("Connected");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.printstr("Connected");
+  lcd.setCursor(0, 0);
+  lcd.printstr("server started");
+  lcd.setCursor(0, 1);
+  for (int i = 0; i < 4; i++)
+  {
+    LOCAL_IP[i] = WiFi.localIP()[i];
+    String t_address = String(LOCAL_IP[i]);
+    char ip_address[4];
+    t_address.toCharArray(ip_address, 4);
+    lcd.printstr(ip_address);
+    // lcd.setCursor(i*3+3, 1);
+    if (i == 3)
+    {
+      break;
+    }
+    lcd.printstr(".");
+  }
+  delay(300);
 }
 
 void emailNotification()
@@ -341,6 +460,7 @@ void setTimer()
   Serial.print("countdown = ");
   Serial.println(countdown);
   server.send(200, "text/plane", "");
+  timer_reminder = millis();
 }
 
 void requestStack()
@@ -351,9 +471,16 @@ void requestStack()
   delay(20);
   Serial.print("loading Stack ");
   Serial.println(stack);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.printstr("loading Stack ");
+  char t_string[3];
+  String(stack).toCharArray(t_string, 3);
+  lcd.printstr(t_string);
   server.send(200, "text/plane", "");
   setPosition(stack);
   loadedStack = stack;
+  med_taken = false;
   runRotation();
 }
 

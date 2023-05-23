@@ -319,6 +319,7 @@
             const day = hour * 24;
 
             var x = setInterval(function () {
+                document.getElementById("headline").innerText = " To Take Medicine!";
                 now = new Date().getTime();
                 distance = _countDownDate - now;
 
