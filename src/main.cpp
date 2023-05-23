@@ -72,7 +72,7 @@ SMTPSession smtp;
 void smtpCallback(SMTP_Status status);
 
 const char EMAIL_ADDRESS[] = "22pg0060@sltc.ac.lk";
-const char EMAIL_PASSWORD[] = "wzxferhmerbtsjva";
+const char EMAIL_PASSWORD[] = "";
 
 const char RECIPIENT_EMAIL[] = "22pg0060@sltc.ac.lk";
 
